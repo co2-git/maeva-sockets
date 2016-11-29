@@ -8,6 +8,7 @@ Framework to set up a web sockets server that can transport database queries and
 # Why
 
 Even when you have a database server set up, you need a relay server (HTTP or Web Sockets) so that your client can connect to the database server. `maeva-sockets` gives a framework so you can easily create a server your client can talk to to transport database queries.
+Especially useful for web, Electron desktop or React Native/reactors clients.
 
 # Server
 

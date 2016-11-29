@@ -1,6 +1,6 @@
 {
   "name": "maeva-sockets",
-  "version": "1.0.0",
+  "version": "1.1.1",
   "description": "",
   "main": "dist/index.js",
   "scripts": {
@@ -10,6 +10,7 @@
     "eslint": "eslint app",
     "mocha": "mocha dist/test"
   },
+  "repository": "https://github.com/co2-git/maeva-sockets",
   "author": "",
   "license": "ISC",
   "devDependencies": {

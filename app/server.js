@@ -1,101 +1,87 @@
-import 'babel-polyfill';
+// @flow
 import {Server as WSServer} from 'ws';
-import maeva from 'maeva';
-import _ from 'lodash';
-import colors from 'colors';
+import send from './helpers/send';
+import desanitize from './desanitize';
+
+try {
+  require('babel-polyfill');
+} catch (error) {}
 
 export default class Server extends WSServer {
-  drivers = [];
+
+  static id = 0;
+
+  connector: Function;
   listeners = [];
+  name: string;
+  port: number;
+  sockets: MaevaSocketsSocket[] = [];
 
-  constructor(port, drivers = []) {
-    super({port});
-    this.drivers = drivers;
-    this.on('connection', this.onConnection.bind(this));
-  }
-
-  log(message) {
-    console.log(colors.grey(JSON.stringify({server: message}, null, 2)));
-  }
-
-  sendTo(ws, message) {
-    ws.send(JSON.stringify(message));
-  }
-
-  onConnection(ws) {
-    ws.maeva = {};
-    console.log('new connexion');
-    ws.on('message', async (messageString) => {
-      try {
-        this.log({messageString});
-        const message = JSON.parse(messageString);
-        const {action} = message;
-        this.log({message});
-
-        switch (action) {
-        case 'auth': {
-          const {auth} = message;
-          ws.conn = await this.onAuth(ws, auth);
-          console.log('connected to db server', auth);
-          this.sendTo(ws, {connected: true});
-        } break;
-
-        case 'listen': {
-          this.listeners.push({ws, ...message});
-          this.sendTo(ws, {message: {addListener: message}});
-        } break;
-
-        case 'find':
-        case 'insert': {
-          const {
-            collection,
-            get,
-            id,
-            set,
-          } = message;
-          try {
-            const results = await ws.conn.operations[action]({
-              collection,
-              get,
-              set,
-            });
-            this.sendTo(ws, {
-              id,
-              action,
-              results,
-            });
-          } catch (error) {
-            console.log(error.stack);
-            this.emit('error', error);
-            this.sendTo(ws, {
-              id,
-              action,
-              error: {
-                message: error.name,
-              },
-            });
-          }
-        } break;
-        }
-      } catch (error) {
-        console.log(error.stack);
-      }
+  constructor({connector, name, port}: MaevaSocketsServerOptions) {
+    if (!port) {
+      throw new Error('Missing port');
+    }
+    super({
+      perMessageDeflate: false,
+      port,
     });
+    this.port = port;
+    this.name = name;
+    this.on('connection', this.onConnection);
+    this.connectToDB(connector);
+    console.log(`Server started on port ${port}`);
   }
 
-  onAuth(ws, auth) {
-    return new Promise(async (resolve, reject) => {
+  connectToDB = (connector: MaevaConnector): Promise<void> =>
+    new Promise(async (resolve, reject) => {
       try {
-        const {driver: driverName} = auth;
-        const driver = _.find(this.drivers, {name: driverName});
-        if (!driver) {
-          throw new Error(`Driver not found: ${driverName}`);
-        }
-        const conn = await maeva.connect(driver.connect(auth.url));
-        resolve(conn);
+        console.log(connector.toString());
+        this.connection = await connector();
+        console.log('conn', this.connection);
+        resolve();
       } catch (error) {
         reject(error);
       }
     });
+
+  onConnection = (socket: WebSocket) => {
+    console.log({socket});
+    const meta = {id: Server.id ++};
+    this.sockets.push({socket, meta});
+    socket.onmessage = this.onMessage(socket);
   }
+
+  // Sockets server receives a new request from front client
+  onMessage = (ws: WebSocket) => (async (message: MessageEvent) => {
+    console.log({message});
+    if (message.type === 'message') {
+      const {action, id, query, model} = JSON.parse(message.data.toString());
+      const {actions} = this.connection.connector;
+      console.log({action, actions, id, query, model});
+      let connectorResponse;
+      if (action === 'insertOne') {
+        const candidate = desanitize(query.set);
+        console.log({desanitized: candidate});
+        connectorResponse = await actions.insertOne(
+          candidate,
+          model,
+        );
+      } else if (action === 'findOne') {
+        const candidate = desanitize(query.get);
+        console.log({desanitized: candidate});
+        connectorResponse = await actions.findOne(
+          candidate,
+          model,
+        );
+      }
+
+      // const connectorResponse = await actions[action](query);
+      const response: MaevaSocketsServerResponse = JSON.stringify({
+        id,
+        connectorResponse,
+      });
+      console.log({response});
+      send(ws, response);
+    }
+  });
 }

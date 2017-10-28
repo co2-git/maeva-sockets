@@ -1,49 +1,55 @@
-import insert from './insert';
-import find from './find';
+// @flow
+/* globals WebSocket */
+import find from 'lodash/find';
+import EventEmitter from 'events';
+import findOne from './findOne';
+import insertOne from './insertOne';
+import queue from './queue';
 
-export default
-function maevaConnectSocketsWeb(Client, socketsUrl, {driver, url}) {
-  return (conn) => new Promise(async (resolve, reject) => {
-    try {
-      const client = new Client(socketsUrl);
+let id = 0;
 
-      await new Promise((resolveOpen) => {
-        client.on('open', resolveOpen);
-      });
+const maevaConnectMaevaSockets = (socketsUrl: string): MaevaConnector => {
+  const emitter = new EventEmitter();
+  let client;
+  const connect = () => {
+    client = new WebSocket(socketsUrl);
 
-      client.auth({driver, url});
+    client.onopen = () => {
+      emitter.emit('connected');
+    };
 
-      await new Promise((resolveDB) => {
-        client.on('connected', resolveDB);
-      });
+    client.onerror = (error) => {
+      console.log(error);
+    };
 
-      conn.operations = {
-        insert: (inserter) => insert(client, inserter),
-        // count: (finder, options) => count(conn, finder, options),
-        find: (finder, options) => new Promise(
-          async (resolveFind, rejectFind) => {
-            try {
-              const {results} = await find(client, finder, options);
-              resolveFind({results, conn: client.conn});
-            } catch (error) {
-              rejectFind(error);
-            }
-          }
-        ),
-        // findOne: (finder, options) => findOne(conn, finder, options),
-        // findById: (finder, options) => findById(conn, finder, options),
-        // update: (updater) => update(conn, updater),
-        // updateOne: (updater) => updateOne(conn, updater),
-        // updateById: (updater) => updateById(conn, updater),
-        // remove: (remover) => remove(conn, remover),
-        // removeById: (remover) => removeById(conn, remover),
-      };
+    // Triggered when server emits response
+    client.onmessage = (event: MessageEvent) => {
+      if (event.type === 'message') {
+        console.log({client: {event}});
+        const data: MaevaSocketsServerResponse = JSON.parse(JSON.parse(
+          event.data.toString()
+        ));
+        console.log({data});
+        const queueItem: ?MaevaSocketsQueueItem = find(queue, {id: data.id});
+        console.log({queueItem, queue});
+        if (queueItem) {
+          queueItem.resolve(data);
+        }
+      }
+    };
+  };
+  return {
+    actions: {
+      connect,
+      disconnect: () => client && client.close(),
+      findOne: (query, model, options) =>
+        findOne(client, query, model, options, id++),
+      insertOne: (candidate, model) =>
+        insertOne(client, candidate, model, id++),
+    },
+    emitter,
+    name: 'websockets',
+  };
+};
 
-      conn.disconnectDriver = ::client.close;
-
-      resolve();
-    } catch (error) {
-      reject(error);
-    }
-  });
-}
+export default maevaConnectMaevaSockets;

@@ -1,7 +1,6 @@
 // @flow
 
 const sanitize = (candidate: Object) => {
-  console.log({sanitize: candidate});
   const sanitized = {};
   for (const field in candidate) {
     const value = candidate[field];

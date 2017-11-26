@@ -1,6 +1,6 @@
 // @flow
 import {Server as WSServer} from 'ws';
-import send from './helpers/send';
+import send from './send';
 import desanitize from './desanitize';
 
 try {
@@ -11,15 +11,17 @@ export default class Server extends WSServer {
 
   static id = 0;
 
+  connection;
   connector: Function;
+  debug: boolean = false;
   listeners = [];
   name: string;
   port: number;
   sockets: MaevaSocketsSocket[] = [];
 
-  constructor({connector, name, port}: MaevaSocketsServerOptions) {
+  constructor({connector, name, port, debug = false}: MaevaSocketsServerOptions) {
     if (!port) {
-      throw new Error('Missing port');
+      port = 3000;
     }
     super({
       perMessageDeflate: false,
@@ -27,17 +29,18 @@ export default class Server extends WSServer {
     });
     this.port = port;
     this.name = name;
+    this.debug = Boolean(debug);
     this.on('connection', this.onConnection);
-    this.connectToDB(connector);
-    console.log(`Server started on port ${port}`);
+    if (this.debug) {
+      console.log(`Server started on port ${port}`);
+    }
+    setTimeout(() => this.connectToDB(connector));
   }
 
   connectToDB = (connector: MaevaConnector): Promise<void> =>
     new Promise(async (resolve, reject) => {
       try {
-        console.log(connector.toString());
         this.connection = await connector();
-        console.log('conn', this.connection);
         resolve();
       } catch (error) {
         reject(error);
@@ -45,7 +48,9 @@ export default class Server extends WSServer {
     });
 
   onConnection = (socket: WebSocket) => {
-    console.log({socket});
+    if (this.debug) {
+      console.log('New socket connection');
+    }
     const meta = {id: Server.id ++};
     this.sockets.push({socket, meta});
     socket.onmessage = this.onMessage(socket);
@@ -53,35 +58,42 @@ export default class Server extends WSServer {
 
   // Sockets server receives a new request from front client
   onMessage = (ws: WebSocket) => (async (message: MessageEvent) => {
-    console.log({message});
+    if (this.debug) {
+      console.log('New message', message.data);
+    }
     if (message.type === 'message') {
       const {action, id, query, model} = JSON.parse(message.data.toString());
       const {actions} = this.connection.connector;
-      console.log({action, actions, id, query, model});
+      if (this.debug) {
+        console.log({action, actions, id, query, model});
+      }
       let connectorResponse;
+
       if (action === 'insertOne') {
         const candidate = desanitize(query.set);
-        console.log({desanitized: candidate});
+        if (this.debug) {
+          console.log({desanitized: candidate});
+        }
         connectorResponse = await actions.insertOne(
           candidate,
           model,
         );
       } else if (action === 'findOne') {
         const candidate = desanitize(query.get);
-        console.log({desanitized: candidate});
+        if (this.debug) {
+          console.log({desanitized: candidate});
+        }
         connectorResponse = await actions.findOne(
           candidate,
           model,
         );
       }
 
-      // const connectorResponse = await actions[action](query);
-      const response: MaevaSocketsServerResponse = JSON.stringify({
-        id,
-        connectorResponse,
-      });
-      console.log({response});
-      send(ws, response);
+      const response: MaevaSocketsServerResponse = connectorResponse;
+      if (this.debug) {
+        console.log({response});
+      }
+      send(ws, {response, id});
     }
   });
 }

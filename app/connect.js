@@ -25,15 +25,12 @@ const maevaConnectMaevaSockets = (socketsUrl: string): MaevaConnector => {
     // Triggered when server emits response
     client.onmessage = (event: MessageEvent) => {
       if (event.type === 'message') {
-        console.log({client: {event}});
-        const data: MaevaSocketsServerResponse = JSON.parse(JSON.parse(
+        const {response, id: dataId}: MaevaSocketsServerResponse = JSON.parse(
           event.data.toString()
-        ));
-        console.log({data});
-        const queueItem: ?MaevaSocketsQueueItem = find(queue, {id: data.id});
-        console.log({queueItem, queue});
+        );
+        const queueItem: ?MaevaSocketsQueueItem = find(queue, {id: dataId});
         if (queueItem) {
-          queueItem.resolve(data);
+          queueItem.resolve(response);
         }
       }
     };

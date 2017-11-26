@@ -2,12 +2,13 @@
 import WS from 'ws';
 import * as maeva from 'maeva';
 import mongodb from 'maeva-mongodb';
+import should from 'should';
 
 import sockets, {Server} from '..';
 
 global.WebSocket = WS;
 
-const model = maeva.model('foo', {score: Number, _id: String});
+const model = maeva.model('foo', {score: Number});
 
 let conn;
 
@@ -21,7 +22,7 @@ describe('Maeva Sockets', () => {
           ),
           name: 'wallets-mongodb',
           port: 12345,
-          debug: false,
+          debug: true,
         });
         resolve(server);
       } catch (error) {
@@ -29,21 +30,31 @@ describe('Maeva Sockets', () => {
       }
     });
   });
-  it('should connect', () => {
-    const connector = sockets('ws://localhost:12345');
-    conn = maeva.connect(connector);
+  describe('Connect', () => {
+    it('should connect', () => {
+      const connector = sockets('ws://localhost:12345', {debug: true});
+      conn = maeva.connect(connector);
+    });
   });
-  it('should insert one', () => new Promise(async (resolve, reject) => {
-    try {
-      const inserted = await maeva.insertOne(
-        model,
-        {score: 0},
-        {connection: conn}
-      );
-      console.log({inserted});
-      resolve();
-    } catch (error) {
-      reject(error);
-    }
-  }));
+  describe('Insert', () => {
+    describe('Insert One', () => {
+      let inserted;
+      it('should insert one', () => new Promise(async (resolve, reject) => {
+        try {
+          inserted = await maeva.insertOne(
+            model,
+            {score: 0},
+            {connection: conn}
+          );
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
+      }));
+      it('should be a valid document', () => {
+        should(inserted.score).eql(0);
+        should(inserted).have.property('_id').which.is.not.null();
+      });
+    });
+  });
 });

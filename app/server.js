@@ -12,7 +12,6 @@ export default class Server extends WSServer {
   static id = 0;
 
   connection;
-  connector: Function;
   debug: boolean = false;
   listeners = [];
   name: string;
@@ -53,6 +52,15 @@ export default class Server extends WSServer {
     }
     const meta = {id: Server.id ++};
     this.sockets.push({socket, meta});
+    socket.send(JSON.stringify({
+      connectionInfo: {
+        connector: {
+          id: {
+            name: this.connection.connector.id.name,
+          }
+        }
+      }
+    }));
     socket.onmessage = this.onMessage(socket);
   }
 
@@ -93,7 +101,7 @@ export default class Server extends WSServer {
       if (this.debug) {
         console.log({response});
       }
-      send(ws, {response, id});
+      send(ws, {response, id}, this);
     }
   });
 }

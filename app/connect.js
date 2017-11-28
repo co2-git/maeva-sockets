@@ -3,6 +3,7 @@
 import EventEmitter from 'events';
 import find from 'lodash/find';
 
+import findOne from './findOne';
 import insertOne from './insertOne';
 import queue from './queue';
 
@@ -38,14 +39,6 @@ const maevaConnectMaevaSockets = (
           _connectorId.name = parsedMessage.connectionInfo.connector.id.name;
         } else if (parsedMessage.message) {
           const {message: {response, id: dataId}} = parsedMessage;
-          console.log();
-          console.log();
-          console.log();
-          console.log();
-          console.log({response, dataId});
-          console.log();
-          console.log();
-          console.log();
           const queueItem = find(queue, {id: dataId});
           if (options.debug) {
             console.log('client got response', {response, dataId});
@@ -63,6 +56,8 @@ const maevaConnectMaevaSockets = (
       disconnect: () => client && client.close(),
       insertOne: (candidate: Object, model: MaevaModel) =>
         insertOne(client, candidate, model, id++),
+      findOne: (candidate: Object, model: MaevaModel) =>
+        findOne(client, candidate, model, id++),
     },
     emitter,
     name: 'websockets',

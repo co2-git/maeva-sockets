@@ -22,7 +22,7 @@ describe('Maeva Sockets', () => {
           ),
           name: 'wallets-mongodb',
           port: 12345,
-          debug: true,
+          debug: false,
         });
         resolve(server);
       } catch (error) {
@@ -32,7 +32,7 @@ describe('Maeva Sockets', () => {
   });
   describe('Connect', () => {
     it('should connect', () => {
-      const connector = sockets('ws://localhost:12345', {debug: true});
+      const connector = sockets('ws://localhost:12345', {debug: false});
       conn = maeva.connect(connector);
     });
   });
@@ -54,6 +54,27 @@ describe('Maeva Sockets', () => {
       it('should be a valid document', () => {
         should(inserted.score).eql(0);
         should(inserted).have.property('_id').which.is.not.null();
+      });
+    });
+  });
+  describe('Find', () => {
+    describe('Find One', () => {
+      let found;
+      it('should insert one', () => new Promise(async (resolve, reject) => {
+        try {
+          found = await maeva.findOne(
+            model,
+            {score: 0},
+            {connection: conn}
+          );
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
+      }));
+      it('should be the correct document', () => {
+        should(found.score).eql(0);
+        should(found).have.property('_id').which.is.not.null();
       });
     });
   });

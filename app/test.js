@@ -60,7 +60,7 @@ describe('Maeva Sockets', () => {
   describe('Find', () => {
     describe('Find One', () => {
       let found;
-      it('should insert one', () => new Promise(async (resolve, reject) => {
+      it('should find one', () => new Promise(async (resolve, reject) => {
         try {
           found = await maeva.findOne(
             model,
@@ -75,6 +75,24 @@ describe('Maeva Sockets', () => {
       it('should be the correct document', () => {
         should(found.score).eql(0);
         should(found).have.property('_id').which.is.not.null();
+      });
+    });
+    describe('Find many', () => {
+      let found;
+      it('should find many', () => new Promise(async (resolve, reject) => {
+        try {
+          found = await maeva.findMany(
+            model,
+            {},
+            {connection: conn}
+          );
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
+      }));
+      it('should be the correct documents', () => {
+        should(found).be.an.Array();
       });
     });
   });

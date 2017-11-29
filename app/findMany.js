@@ -1,11 +1,12 @@
+
 import sanitize from './sanitize';
 import queue from './queue';
 
-const findOne = (client: WebSocket, query, model, options = {}, id) => new Promise(
+const findMany = (client: WebSocket, query, model, options = {}, id) => new Promise(
   async (resolve, reject) => {
     try {
-      const message: MaevaSocketsClientRequest = JSON.stringify({
-        action: 'findOne',
+      const message = JSON.stringify({
+        action: 'findMany',
         id,
         model,
         query: {
@@ -27,4 +28,4 @@ const findOne = (client: WebSocket, query, model, options = {}, id) => new Promi
   }
 );
 
-export default findOne;
+export default findMany;

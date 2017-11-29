@@ -1,7 +1,8 @@
-// @flow
+
 import {Server as WSServer} from 'ws';
 import send from './send';
 import desanitize from './desanitize';
+import * as logger from './logger';
 
 try {
   require('babel-polyfill');
@@ -18,7 +19,7 @@ export default class Server extends WSServer {
   port: number;
   sockets: MaevaSocketsSocket[] = [];
 
-  constructor({connector, name, port, debug = false}: MaevaSocketsServerOptions) {
+  constructor({connector, name, port, debug = false}) {
     if (!port) {
       port = 3000;
     }
@@ -31,7 +32,7 @@ export default class Server extends WSServer {
     this.debug = Boolean(debug);
     this.on('connection', this.onConnection);
     if (this.debug) {
-      console.log(`Server started on port ${port}`);
+      logger.log('Server started', 'server', {port});
     }
     setTimeout(() => this.connectToDB(connector));
   }
@@ -40,6 +41,11 @@ export default class Server extends WSServer {
     new Promise(async (resolve, reject) => {
       try {
         this.connection = await connector();
+        if (this.debug) {
+          logger.log(
+            'Connector connected', 'server', this.connection.connector.name
+          );
+        }
         resolve();
       } catch (error) {
         reject(error);
@@ -47,10 +53,10 @@ export default class Server extends WSServer {
     });
 
   onConnection = (socket: WebSocket) => {
-    if (this.debug) {
-      console.log('New socket connection');
-    }
     const meta = {id: Server.id ++};
+    if (this.debug) {
+      logger.log('New socket', 'server', `#${meta.id}`);
+    }
     this.sockets.push({socket, meta});
     socket.send(JSON.stringify({
       connectionInfo: {
@@ -58,6 +64,9 @@ export default class Server extends WSServer {
           id: {
             name: this.connection.connector.id.name,
           }
+        },
+        socket: {
+          meta
         }
       }
     }));
@@ -67,31 +76,28 @@ export default class Server extends WSServer {
   // Sockets server receives a new request from front client
   onMessage = (ws: WebSocket) => (async (message: MessageEvent) => {
     if (this.debug) {
-      console.log('New message', message.data);
+      logger.log('New message', 'server', JSON.parse(message.data), 2);
     }
     if (message.type === 'message') {
       const {action, id, query, model} = JSON.parse(message.data.toString());
       const {actions} = this.connection.connector;
-      if (this.debug) {
-        console.log({action, actions, id, query, model});
-      }
       let connectorResponse;
 
       if (action === 'insertOne') {
         const candidate = desanitize(query.set);
-        if (this.debug) {
-          console.log({desanitized: candidate});
-        }
         connectorResponse = await actions.insertOne(
           candidate,
           model,
         );
       } else if (action === 'findOne') {
         const candidate = desanitize(query.get);
-        if (this.debug) {
-          console.log({desanitized: candidate});
-        }
         connectorResponse = await actions.findOne(
+          candidate,
+          model,
+        );
+      } else if (action === 'findMany') {
+        const candidate = desanitize(query.get);
+        connectorResponse = await actions.findMany(
           candidate,
           model,
         );
@@ -99,7 +105,7 @@ export default class Server extends WSServer {
 
       const response: MaevaSocketsServerResponse = connectorResponse;
       if (this.debug) {
-        console.log({response});
+        logger.log('Got response from connector', 'server', {response}, 2);
       }
       send(ws, {response, id}, this);
     }

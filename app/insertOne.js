@@ -1,4 +1,3 @@
-// @flow
 import queue from './queue';
 import sanitize from './sanitize';
 import * as constants from './constants';
@@ -7,6 +6,7 @@ const insertOne = (
   client: WebSocket,
   candidate: Object,
   model: Object,
+  options = {},
   id: number
 ): Promise<Object> =>
   new Promise(

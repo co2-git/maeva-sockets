@@ -1,14 +1,15 @@
 /* globals describe before it */
 import WS from 'ws';
-import * as maeva from 'maeva';
+import * as data from 'maeva';
 import mongodb from 'maeva-mongodb';
 import should from 'should';
+import 'babel-polyfill';
 
 import sockets, {Server} from '..';
 
 global.WebSocket = WS;
 
-const model = maeva.model('foo', {score: Number});
+const model = data.model('foo', {score: Number});
 
 let conn;
 
@@ -17,7 +18,7 @@ describe('Maeva Sockets', () => {
     await new Promise((resolve, reject) => {
       try {
         const server = new Server({
-          connector: () => maeva.connect(
+          connector: () => data.connect(
             mongodb('mongodb://localhost:7007/maeva-sockets')
           ),
           name: 'wallets-mongodb',
@@ -33,7 +34,7 @@ describe('Maeva Sockets', () => {
   describe('Connect', () => {
     it('should connect', () => {
       const connector = sockets('ws://localhost:12345', {debug: false});
-      conn = maeva.connect(connector);
+      conn = data.connect(connector);
     });
   });
   describe('Insert', () => {
@@ -41,7 +42,7 @@ describe('Maeva Sockets', () => {
       let inserted;
       it('should insert one', () => new Promise(async (resolve, reject) => {
         try {
-          inserted = await maeva.insertOne(
+          inserted = await data.insertOne(
             model,
             {score: 0},
             {connection: conn}
@@ -62,7 +63,7 @@ describe('Maeva Sockets', () => {
       let found;
       it('should find one', () => new Promise(async (resolve, reject) => {
         try {
-          found = await maeva.findOne(
+          found = await data.findOne(
             model,
             {score: 0},
             {connection: conn}
@@ -77,11 +78,47 @@ describe('Maeva Sockets', () => {
         should(found).have.property('_id').which.is.not.null();
       });
     });
+    describe('Find One with link', () => {
+      let found;
+      let team;
+      it('should find one', () => new Promise(async (resolve, reject) => {
+        try {
+          const teamModel = data.model('teams', {name: String});
+          team = await data.insertOne(
+            teamModel,
+            {name: 'Barca'},
+            {connection: conn}
+          );
+          const playerModel = data.model(
+            'players',
+            {name: String, team: data.link(teamModel)}
+          );
+          await data.insertOne(
+            playerModel,
+            {team, name: 'Messi'},
+            {connection: conn}
+          );
+          found = await data.findOne(
+            playerModel,
+            {team},
+            {connection: conn}
+          );
+          console.log({found});
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
+      }));
+      it('should be the correct document', () => {
+        should(found.name).eql('Messi');
+        should(found.team).eql(team._id);
+      });
+    });
     describe('Find many', () => {
       let found;
       it('should find many', () => new Promise(async (resolve, reject) => {
         try {
-          found = await maeva.findMany(
+          found = await data.findMany(
             model,
             {},
             {connection: conn}

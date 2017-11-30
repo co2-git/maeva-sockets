@@ -79,35 +79,50 @@ export default class Server extends WSServer {
       logger.log('New message', 'server', JSON.parse(message.data), 2);
     }
     if (message.type === 'message') {
-      const {action, id, query, model} = JSON.parse(message.data.toString());
-      const {actions} = this.connection.connector;
-      let connectorResponse;
+      const data = JSON.parse(message.data.toString());
+      const {action} = data;
+      const {actions, id: connectorId} = this.connection.connector;
 
-      if (action === 'insertOne') {
-        const candidate = desanitize(query.set);
-        connectorResponse = await actions.insertOne(
-          candidate,
-          model,
-        );
-      } else if (action === 'findOne') {
-        const candidate = desanitize(query.get);
-        connectorResponse = await actions.findOne(
-          candidate,
-          model,
-        );
-      } else if (action === 'findMany') {
-        const candidate = desanitize(query.get);
-        connectorResponse = await actions.findMany(
-          candidate,
-          model,
-        );
-      }
+      if (action === 'validate') {
+        if (this.debug) {
+          logger.log('Validate request', 'server', data, 2);
+        }
+        try {
+          await connectorId.type.validate(...data.args);
+          ws.send(JSON.stringify({validated: data.validateId, result: true}));
+        } catch (error) {
+          ws.send(JSON.stringify({validated: data.validateId, result: error}));
+        }
+      } else {
+        const {id, query, model} = data;
+        let connectorResponse;
 
-      const response: MaevaSocketsServerResponse = connectorResponse;
-      if (this.debug) {
-        logger.log('Got response from connector', 'server', {response}, 2);
+        if (action === 'insertOne') {
+          const candidate = desanitize(query.set);
+          connectorResponse = await actions.insertOne(
+            candidate,
+            model,
+          );
+        } else if (action === 'findOne') {
+          const candidate = desanitize(query.get);
+          connectorResponse = await actions.findOne(
+            candidate,
+            model,
+          );
+        } else if (action === 'findMany') {
+          const candidate = desanitize(query.get);
+          connectorResponse = await actions.findMany(
+            candidate,
+            model,
+          );
+        }
+
+        const response: MaevaSocketsServerResponse = connectorResponse;
+        if (this.debug) {
+          logger.log('Got response from connector', 'server', {response}, 2);
+        }
+        send(ws, {response, id}, this);
       }
-      send(ws, {response, id}, this);
     }
   });
 }

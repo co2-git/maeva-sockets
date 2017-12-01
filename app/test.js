@@ -133,4 +133,27 @@ describe('Maeva Sockets', () => {
       });
     });
   });
+  describe('Update', () => {
+    describe('Update by id', () => {
+      let inserted;
+      it('should insert', () => new Promise(async (resolve, reject) => {
+        try {
+          inserted = await data.insertOne(model, {score: 999});
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
+      }));
+      it('should update', () => new Promise(async (resolve, reject) => {
+        try {
+          const updated = await data.updateById(model, inserted, {score: 997});
+          should(updated.score).eql(997);
+          should(updated._id).eql(inserted._id);
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
+      }));
+    });
+  });
 });

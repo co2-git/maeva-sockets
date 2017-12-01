@@ -6,6 +6,7 @@ import find from 'lodash/find';
 import findOne from './findOne';
 import findMany from './findMany';
 import insertOne from './insertOne';
+import updateById from './updateById';
 import queue from './queue';
 import * as logger from './logger';
 
@@ -98,6 +99,20 @@ const maevaConnectMaevaSockets = (
         findOne(client, query, model, statementOptions, id++),
       findMany: (query: Object, model, statementOptions) =>
         findMany(client, query, model, statementOptions, id++),
+      updateById: (docId, updater, model, $options = {}) =>
+        updateById(
+          client,
+          docId,
+          updater,
+          model,
+          {
+            ...$options,
+            connector: {
+              id: _connectorId,
+            },
+          },
+          id++,
+        )
     },
     emitter,
     name: 'websockets',

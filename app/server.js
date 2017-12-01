@@ -115,6 +115,14 @@ export default class Server extends WSServer {
             candidate,
             model,
           );
+        } else if (action === 'updateById') {
+          const $id = query.get;
+          const set = desanitize(query.set);
+          connectorResponse = await actions.updateById(
+            $id,
+            set,
+            model,
+          );
         }
 
         const response: MaevaSocketsServerResponse = connectorResponse;

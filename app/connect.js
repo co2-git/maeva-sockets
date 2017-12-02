@@ -25,6 +25,7 @@ const maevaConnectMaevaSockets = (
 ) => {
   const emitter = new EventEmitter();
   let client;
+  let clientStatus = 'disconnected';
   let _connectorId = {
     type: {
       convert: (...args) => new Promise((resolve, reject) => {
@@ -68,11 +69,20 @@ const maevaConnectMaevaSockets = (
     client = new WebSocket(socketsUrl);
 
     client.onopen = () => {
+      clientStatus = 'connected';
       emitter.emit('connected');
     };
 
     client.onerror = (error) => {
+      // if (client.readyState !== 1 && clientStatus === 'disconnected') {
+      //   emitter.emit('disconnected');
+      // }
       console.log(error);
+    };
+
+    client.onclose = () => {
+      clientStatus = 'disconnected';
+      emitter.emit('disconnected');
     };
 
     // Triggered when server emits response

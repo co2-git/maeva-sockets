@@ -103,7 +103,6 @@ describe('Maeva Sockets', () => {
             {team},
             {connection: conn}
           );
-          console.log({found});
           resolve();
         } catch (error) {
           reject(error);
@@ -132,13 +131,30 @@ describe('Maeva Sockets', () => {
         should(found).be.an.Array();
       });
     });
+    describe('Find by id', () => {
+      let inserted;
+      let found;
+      it('should insert one', async () => {
+        inserted = await data.insertOne(model, {foo: 0});
+      });
+      it('should find by id', async () => {
+        found = await data.findById(model, inserted);
+      });
+      it('should be the right id', () => {
+        should(data.getDocumentId(found)).eql(data.getDocumentId(inserted));
+      });
+    });
   });
   describe('Update', () => {
     describe('Update by id', () => {
       let inserted;
       it('should insert', () => new Promise(async (resolve, reject) => {
         try {
-          inserted = await data.insertOne(model, {score: 999});
+          inserted = await data.insertOne(
+            model,
+            {score: 999},
+            {connection: conn}
+          );
           resolve();
         } catch (error) {
           reject(error);
@@ -146,7 +162,12 @@ describe('Maeva Sockets', () => {
       }));
       it('should update', () => new Promise(async (resolve, reject) => {
         try {
-          const updated = await data.updateById(model, inserted, {score: 997});
+          const updated = await data.updateById(
+            model,
+            inserted,
+            {score: 997},
+            {connection: conn}
+          );
           should(updated.score).eql(997);
           should(updated._id).eql(inserted._id);
           resolve();

@@ -93,6 +93,14 @@ export default class Server extends WSServer {
         } catch (error) {
           ws.send(JSON.stringify({validated: data.validateId, result: error}));
         }
+      } else if (action === 'convert') {
+        if (this.debug) {
+          logger.log('Convert request', 'server', data, 2);
+        }
+        const converted = await connectorId.type.convert(...data.args);
+        ws.send(
+          JSON.stringify({converted: data.convertId, result: converted})
+        );
       } else {
         const {id, query, model} = data;
         let connectorResponse;

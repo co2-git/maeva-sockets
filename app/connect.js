@@ -12,8 +12,10 @@ import * as logger from './logger';
 
 let id = 0;
 let validateId = 0;
+let convertId = 0;
 
 const listenValidate = new EventEmitter();
+const listenConvert = new EventEmitter();
 
 const maevaConnectMaevaSockets = (
   socketsUrl: string,
@@ -23,26 +25,36 @@ const maevaConnectMaevaSockets = (
   let client;
   let _connectorId = {
     type: {
-    //   convert: (...args) => new Promise((resolve, reject) => {
-    //     try {
-    //       console.log({args});
-    //       client.send(JSON.stringify('hello'));
-    //       resolve(args[0]);
-    //     } catch (error) {
-    //       reject(error);
-    //     }
-    //   }),
+      convert: (...args) => new Promise((resolve, reject) => {
+        try {
+          const convId = convertId++;
+          client.send(
+            JSON.stringify({action: 'convert', args, convertId: convId})
+          );
+          const listener = (converted) => {
+            listenValidate.removeListener(convId.toString(), listener);
+            resolve(converted);
+          };
+          listenConvert.on(convId.toString(), listener);
+        } catch (error) {
+          reject(error);
+        }
+      }),
       validate: (...args) => new Promise((resolve, reject) => {
         try {
           const valId = validateId++;
-          client.send(JSON.stringify({action: 'validate', args, validateId: valId}));
-          const listener = listenValidate.on(valId.toString(), (valid) => {
+          client.send(
+            JSON.stringify({action: 'validate', args, validateId: valId})
+          );
+          const listener = (valid) => {
+            listenValidate.removeListener(valId.toString(), listener);
             if (valid === true) {
               resolve();
             } else {
               reject(new Error(valid.message));
             }
-          });
+          };
+          listenValidate.on(valId.toString(), listener);
         } catch (error) {
           reject(error);
         }
@@ -74,6 +86,8 @@ const maevaConnectMaevaSockets = (
           clientId = parsedMessage.connectionInfo.socket.meta.id;
         } else if ('validated' in parsedMessage) {
           listenValidate.emit(parsedMessage.validated, parsedMessage.result);
+        } else if ('converted' in parsedMessage) {
+          listenConvert.emit(parsedMessage.converted, parsedMessage.result);
         } else if (parsedMessage.message) {
           const {message: {response, id: dataId}} = parsedMessage;
           if (isNaN(dataId)) {

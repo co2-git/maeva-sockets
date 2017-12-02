@@ -135,13 +135,14 @@ describe('Maeva Sockets', () => {
       let inserted;
       let found;
       it('should insert one', async () => {
-        inserted = await data.insertOne(model, {foo: 0});
+        inserted = await data.insertOne(model, {score: 0}, {connection: conn});
       });
       it('should find by id', async () => {
-        found = await data.findById(model, inserted);
+        found = await data.findById(model, inserted, {connection: conn});
       });
       it('should be the right id', () => {
-        should(data.getDocumentId(found)).eql(data.getDocumentId(inserted));
+        should(data.getDocumentId(found, conn))
+          .eql(data.getDocumentId(inserted, conn));
       });
     });
   });

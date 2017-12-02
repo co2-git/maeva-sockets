@@ -4,6 +4,7 @@ import EventEmitter from 'events';
 import find from 'lodash/find';
 
 import findOne from './findOne';
+import findById from './findById';
 import findMany from './findMany';
 import insertOne from './insertOne';
 import updateById from './updateById';
@@ -107,11 +108,13 @@ const maevaConnectMaevaSockets = (
     actions: {
       connect,
       disconnect: () => client && client.close(),
-      insertOne: (candidate: Object, model, statementOptions) =>
+      insertOne: (candidate, model, statementOptions) =>
         insertOne(client, candidate, model, statementOptions, id++),
-      findOne: (query: Object, model, statementOptions) =>
+      findOne: (query, model, statementOptions) =>
         findOne(client, query, model, statementOptions, id++),
-      findMany: (query: Object, model, statementOptions) =>
+      findById: (docId, model, statementOptions) =>
+        findById(client, docId, model, statementOptions, id++),
+      findMany: (query, model, statementOptions) =>
         findMany(client, query, model, statementOptions, id++),
       updateById: (docId, updater, model, $options = {}) =>
         updateById(

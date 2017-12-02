@@ -1,12 +1,12 @@
 {
   "name": "maeva-sockets",
-  "version": "1.3.7",
+  "version": "1.3.8",
   "description": "",
   "main": "dist/index.js",
   "scripts": {
     "test": "mocha dist/test.js",
-    "babel": "babel --out-dir dist/ app",
-    "babel:watch": "babel --watch --out-dir dist/ app",
+    "babel": "rm -rf dist && babel --out-dir dist/ app",
+    "babel:watch": "rm -rf dist && babel --watch --out-dir dist/ app",
     "eslint": "eslint app"
   },
   "repository": "https://github.com/co2-git/maeva-sockets",

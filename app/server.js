@@ -117,6 +117,12 @@ export default class Server extends WSServer {
             candidate,
             model,
           );
+        } else if (action === 'findById') {
+          const $id = query.get;
+          connectorResponse = await actions.findById(
+            $id,
+            model,
+          );
         } else if (action === 'findMany') {
           const candidate = desanitize(query.get);
           connectorResponse = await actions.findMany(

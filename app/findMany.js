@@ -1,4 +1,3 @@
-
 import sanitize from './sanitize';
 import queue from './queue';
 

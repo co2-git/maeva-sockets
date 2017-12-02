@@ -4,7 +4,7 @@ import queue from './queue';
 const findOne = (client: WebSocket, query, model, options = {}, id) => new Promise(
   async (resolve, reject) => {
     try {
-      const message: MaevaSocketsClientRequest = JSON.stringify({
+      const message = JSON.stringify({
         action: 'findOne',
         id,
         model,
@@ -15,7 +15,7 @@ const findOne = (client: WebSocket, query, model, options = {}, id) => new Promi
       // Send query to server which will echo it to connector
       client.send(message);
       // Queue listener for server response
-      const queueItem: MaevaSocketsQueueItem = {
+      const queueItem = {
         id,
         resolve,
         reject,

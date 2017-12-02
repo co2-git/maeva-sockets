@@ -111,6 +111,12 @@ export default class Server extends WSServer {
             candidate,
             model,
           );
+        } else if (action === 'insertMany') {
+          const documents = query.set.map(desanitize);
+          connectorResponse = await actions.insertMany(
+            documents,
+            model,
+          );
         } else if (action === 'findOne') {
           const candidate = desanitize(query.get);
           connectorResponse = await actions.findOne(

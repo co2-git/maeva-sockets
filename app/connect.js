@@ -7,6 +7,7 @@ import findOne from './findOne';
 import findById from './findById';
 import findMany from './findMany';
 import insertOne from './insertOne';
+import insertMany from './insertMany';
 import updateById from './updateById';
 import queue from './queue';
 import * as logger from './logger';
@@ -110,6 +111,8 @@ const maevaConnectMaevaSockets = (
       disconnect: () => client && client.close(),
       insertOne: (candidate, model, statementOptions) =>
         insertOne(client, candidate, model, statementOptions, id++),
+      insertMany: (documents, model, statementOptions) =>
+        insertMany(client, documents, model, statementOptions, id++),
       findOne: (query, model, statementOptions) =>
         findOne(client, query, model, statementOptions, id++),
       findById: (docId, model, statementOptions) =>

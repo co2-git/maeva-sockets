@@ -57,6 +57,21 @@ describe('Maeva Sockets', () => {
         should(inserted).have.property('_id').which.is.not.null();
       });
     });
+    describe('Insert many', () => {
+      let inserted;
+      it('should insert many', async () => {
+        inserted = await data.insertMany(
+          model,
+          [
+            {score: 1},
+            {score: 2},
+            {score: 3},
+          ],
+          {connection: conn}
+        );
+        console.log({inserted});
+      });
+    });
   });
   describe('Find', () => {
     describe('Find One', () => {

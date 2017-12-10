@@ -1,5 +1,3 @@
-// @flow
-
 const sanitize = (candidate: Object) => {
   const sanitized = {};
   for (const field in candidate) {

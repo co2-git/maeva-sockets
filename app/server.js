@@ -1,8 +1,8 @@
-
 import {Server as WSServer} from 'ws';
-import send from './send';
-import desanitize from './desanitize';
-import * as logger from './logger';
+import pick from 'lodash/pick';
+
+import * as logger from './lib/logger';
+import send from './lib/send';
 
 try {
   require('babel-polyfill');
@@ -46,31 +46,40 @@ export default class Server extends WSServer {
             'Connector connected', 'server', this.connection.connector.name
           );
         }
+        for (const {meta, socket} of this.sockets) {
+          socket.send(JSON.stringify({
+            connectionInfo: {
+              connectorIdName: this.connection.connector.idName,
+              socket: {meta}
+            }
+          }));
+        }
         resolve();
       } catch (error) {
+        console.log('OH MY GOD');
         reject(error);
       }
     });
 
   onConnection = (socket: WebSocket) => {
-    const meta = {id: Server.id ++};
-    if (this.debug) {
-      logger.log('New socket', 'server', `#${meta.id}`);
-    }
-    this.sockets.push({socket, meta});
-    socket.send(JSON.stringify({
-      connectionInfo: {
-        connector: {
-          id: {
-            name: this.connection.connector.id.name,
-          }
-        },
-        socket: {
-          meta
-        }
+    try {
+      const meta = {id: Server.id ++};
+      if (this.debug) {
+        logger.log('New socket', 'server', `#${meta.id}`);
       }
-    }));
-    socket.onmessage = this.onMessage(socket);
+      this.sockets.push({socket, meta});
+      socket.send(JSON.stringify({
+        connectionInfo: {
+          connectorIdName: this.connection.connector.idName,
+          socket: {meta}
+        }
+      }));
+      socket.onmessage = this.onMessage(socket);
+    } catch (error) {
+      if (this.debug) {
+        logger.log('Error', 'server', error.stack.split(/\n/), 2);
+      }
+    }
   }
 
   // Sockets server receives a new request from front client
@@ -80,76 +89,101 @@ export default class Server extends WSServer {
     }
     if (message.type === 'message') {
       const data = JSON.parse(message.data.toString());
-      const {action} = data;
-      const {actions, id: connectorId} = this.connection.connector;
-
-      if (action === 'validate') {
-        if (this.debug) {
-          logger.log('Validate request', 'server', data, 2);
+      const {action, socketId, query, model} = data;
+      const {actions} = this.connection.connector;
+      const {
+        id: $id,
+        ids,
+        document,
+        documents,
+        queries,
+        updaters,
+        options
+      } = query;
+      let connectorResponse;
+      try {
+        const queryQueries = [
+          'count',
+          'findOne', 'findMany',
+          'removeOne', 'removeMany',
+        ];
+        for (const statement of queryQueries) {
+          if (statement === action) {
+            connectorResponse = await actions[action](
+              queries,
+              model,
+              options,
+            );
+          }
         }
-        try {
-          await connectorId.type.validate(...data.args);
-          ws.send(JSON.stringify({validated: data.validateId, result: true}));
-        } catch (error) {
-          ws.send(JSON.stringify({validated: data.validateId, result: error}));
+        const idQueries = ['findById', 'removeById'];
+        for (const statement of idQueries) {
+          if (statement === action) {
+            connectorResponse = await actions[action](
+              $id,
+              model,
+              options,
+            );
+          }
         }
-      } else if (action === 'convert') {
-        if (this.debug) {
-          logger.log('Convert request', 'server', data, 2);
+        const idsQueries = ['findByIds', 'removeByIds'];
+        for (const statement of idsQueries) {
+          if (statement === action) {
+            connectorResponse = await actions[action](
+              ids,
+              model,
+              options,
+            );
+          }
         }
-        const converted = await connectorId.type.convert(...data.args);
-        ws.send(
-          JSON.stringify({converted: data.convertId, result: converted})
-        );
-      } else {
-        const {id, query, model} = data;
-        let connectorResponse;
-
-        if (action === 'insertOne') {
-          const candidate = desanitize(query.set);
-          connectorResponse = await actions.insertOne(
-            candidate,
-            model,
-          );
-        } else if (action === 'insertMany') {
-          const documents = query.set.map(desanitize);
-          connectorResponse = await actions.insertMany(
-            documents,
-            model,
-          );
-        } else if (action === 'findOne') {
-          const candidate = desanitize(query.get);
-          connectorResponse = await actions.findOne(
-            candidate,
-            model,
-          );
-        } else if (action === 'findById') {
-          const $id = query.get;
-          connectorResponse = await actions.findById(
-            $id,
-            model,
-          );
-        } else if (action === 'findMany') {
-          const candidate = desanitize(query.get);
-          connectorResponse = await actions.findMany(
-            candidate,
-            model,
-          );
-        } else if (action === 'updateById') {
-          const $id = query.get;
-          const set = desanitize(query.set);
-          connectorResponse = await actions.updateById(
-            $id,
-            set,
-            model,
-          );
+        const insertQueries = ['insertOne', 'insertMany'];
+        for (const statement of insertQueries) {
+          if (statement === action) {
+            connectorResponse = await actions[action](
+              document || documents,
+              model,
+              options,
+            );
+          }
         }
-
-        const response: MaevaSocketsServerResponse = connectorResponse;
+        const updateQueries = ['updateOne', 'updateMany'];
+        for (const statement of updateQueries) {
+          if (statement === action) {
+            connectorResponse = await actions[action](
+              queries,
+              updaters,
+              model,
+              options,
+            );
+          }
+        }
+        const updateIdQueries = ['updateById', 'updateByIds'];
+        for (const statement of updateIdQueries) {
+          if (statement === action) {
+            connectorResponse = await actions[action](
+              $id || ids,
+              updaters,
+              model,
+              options,
+            );
+          }
+        }
+        const response = connectorResponse;
         if (this.debug) {
           logger.log('Got response from connector', 'server', {response}, 2);
         }
-        send(ws, {response, id}, this);
+        send(ws, {response, socketId});
+      } catch (error) {
+        let err = pick(error, ['name', 'code', 'stack', 'message']);
+        if (this.debug) {
+          logger.log(
+            'Error',
+            'server',
+            {...err, stack: err.stack.split(/\n/)},
+            2
+          );
+        }
+        send(ws, {error: err, socketId});
       }
     }
   });

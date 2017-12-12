@@ -1,8 +1,7 @@
 import {Server as WSServer} from 'ws';
 import pick from 'lodash/pick';
 
-import * as logger from './lib/logger';
-import send from './lib/send';
+import * as logger from './logger';
 
 try {
   require('babel-polyfill');
@@ -83,108 +82,167 @@ export default class Server extends WSServer {
   }
 
   // Sockets server receives a new request from front client
-  onMessage = (ws: WebSocket) => (async (message: MessageEvent) => {
-    if (this.debug) {
-      logger.log('New message', 'server', JSON.parse(message.data), 2);
-    }
-    if (message.type === 'message') {
-      const data = JSON.parse(message.data.toString());
-      const {action, socketId, query, model} = data;
-      const {actions} = this.connection.connector;
-      const {
-        id: $id,
-        ids,
-        document,
-        documents,
-        queries,
-        updaters,
-        options
-      } = query;
-      let connectorResponse;
-      try {
-        const queryQueries = [
-          'count',
-          'findOne', 'findMany',
-          'removeOne', 'removeMany',
-        ];
-        for (const statement of queryQueries) {
-          if (statement === action) {
-            connectorResponse = await actions[action](
-              queries,
-              model,
-              options,
-            );
-          }
-        }
-        const idQueries = ['findById', 'removeById'];
-        for (const statement of idQueries) {
-          if (statement === action) {
-            connectorResponse = await actions[action](
-              $id,
-              model,
-              options,
-            );
-          }
-        }
-        const idsQueries = ['findByIds', 'removeByIds'];
-        for (const statement of idsQueries) {
-          if (statement === action) {
-            connectorResponse = await actions[action](
-              ids,
-              model,
-              options,
-            );
-          }
-        }
-        const insertQueries = ['insertOne', 'insertMany'];
-        for (const statement of insertQueries) {
-          if (statement === action) {
-            connectorResponse = await actions[action](
-              document || documents,
-              model,
-              options,
-            );
-          }
-        }
-        const updateQueries = ['updateOne', 'updateMany'];
-        for (const statement of updateQueries) {
-          if (statement === action) {
-            connectorResponse = await actions[action](
-              queries,
-              updaters,
-              model,
-              options,
-            );
-          }
-        }
-        const updateIdQueries = ['updateById', 'updateByIds'];
-        for (const statement of updateIdQueries) {
-          if (statement === action) {
-            connectorResponse = await actions[action](
-              $id || ids,
-              updaters,
-              model,
-              options,
-            );
-          }
+  onMessage = (ws: WebSocket) => (message) =>
+  new Promise(async (resolve, reject) => {
+    let queueId;
+    try {
+      if (this.debug) {
+        logger.log('New message', 'server', JSON.parse(message.data), 2);
+      }
+      if (message.type === 'message') {
+        const data = JSON.parse(message.data.toString());
+        const {action, query, model} = data.message;
+        queueId = data.message.id;
+        const {actions} = this.connection.connector;
+        const {
+          id,
+          ids,
+          document,
+          documents,
+          queries,
+          updaters,
+          options
+        } = query;
+        let connectorResponse;
+        switch (action) {
+        case 'count':
+          connectorResponse = await actions.count(
+            queries,
+            model,
+            options,
+          );
+          break;
+        case 'findById':
+          connectorResponse = await actions.findById(
+            id,
+            model,
+            options,
+          );
+          break;
+        case 'findByIds':
+          connectorResponse = await actions.findByIds(
+            ids,
+            model,
+            options,
+          );
+          break;
+        case 'findOne':
+          connectorResponse = await actions.findOne(
+            queries,
+            model,
+            options,
+          );
+          break;
+        case 'findMany':
+          connectorResponse = await actions.findMany(
+            queries,
+            model,
+            options,
+          );
+          break;
+        case 'insertOne':
+          connectorResponse = await actions.insertOne(
+            document,
+            model,
+            options,
+          );
+          break;
+        case 'insertMany':
+          connectorResponse = await actions.insertMany(
+            documents,
+            model,
+            options,
+          );
+          break;
+        case 'removeById':
+          connectorResponse = await actions.removeById(
+            id,
+            model,
+            options,
+          );
+          break;
+        case 'removeByIds':
+          connectorResponse = await actions.removeByIds(
+            ids,
+            model,
+            options,
+          );
+          break;
+        case 'removeMany':
+          connectorResponse = await actions.removeMany(
+            queries,
+            model,
+            options,
+          );
+          break;
+        case 'removeOne':
+          connectorResponse = await actions.removeOne(
+            queries,
+            model,
+            options,
+          );
+          break;
+        case 'updateById':
+          connectorResponse = await actions.updateById(
+            id,
+            updaters,
+            model,
+            options,
+          );
+          break;
+        case 'updateByIds':
+          connectorResponse = await actions.updateByIds(
+            ids,
+            updaters,
+            model,
+            options,
+          );
+          break;
+        case 'updateOne':
+          connectorResponse = await actions.updateOne(
+            queries,
+            updaters,
+            model,
+            options,
+          );
+          break;
+        case 'updateMany':
+          connectorResponse = await actions.updateMany(
+            queries,
+            updaters,
+            model,
+            options,
+          );
+          break;
         }
         const response = connectorResponse;
         if (this.debug) {
           logger.log('Got response from connector', 'server', {response}, 2);
         }
-        send(ws, {response, socketId});
-      } catch (error) {
-        let err = pick(error, ['name', 'code', 'stack', 'message']);
-        if (this.debug) {
-          logger.log(
-            'Error',
-            'server',
-            {...err, stack: err.stack.split(/\n/)},
-            2
-          );
-        }
-        send(ws, {error: err, socketId});
+        ws.send(JSON.stringify({message: {response, id: queueId}}));
       }
+    } catch (error) {
+      let err = pick(error, ['name', 'code', 'stack', 'message']);
+      if (this.debug) {
+        logger.log(
+          'Error',
+          'server',
+          {...err, stack: err.stack.split(/\n/)},
+          2
+        );
+      }
+      ws.send(JSON.stringify({message: {error: err, id: queueId}}));
+      reject(error);
+    }
+  }).catch(error => {
+    let err = pick(error, ['name', 'code', 'stack', 'message']);
+    if (this.debug) {
+      logger.log(
+        'Error',
+        'server',
+        {...err, stack: err.stack.split(/\n/)},
+        2
+      );
     }
   });
 }

@@ -1,10 +1,9 @@
 /* globals WebSocket */
 import 'babel-polyfill';
 import EventEmitter from 'events';
-import filter from 'lodash/filter';
-import reject from 'lodash/reject';
+import find from 'lodash/find';
 
-import * as logger from './lib/logger';
+import * as logger from './logger';
 
 const connector = (url, connectorOptions = {}) => {
   const emitter = new EventEmitter();
@@ -43,33 +42,25 @@ const connector = (url, connectorOptions = {}) => {
         } else if (parsedMessage.message) {
           try {
             const {
-              message: {error, response, socketId: messageSocketId}
+              message: {error, response, id}
             } = parsedMessage;
-            if (isNaN(messageSocketId)) {
-              throw new Error('Message has no socket id');
-            }
-            const items = filter(queue, {socketId});
-            if (!items.length) {
+            const item = find(queue, {id});
+            if (!item) {
               if (connectorOptions.debug) {
                 logger.log(
-                  'Queue empty for socket id',
+                  `Could not find queue item #${id}`,
                   socketId,
                   queue,
                   2,
                 );
               }
+            } else if (error) {
+              let err = new Error(error.message);
+              err.code = error.code;
+              err.stack = error.stack;
+              item.reject(err);
             } else {
-              for (const item of items) {
-                if (error) {
-                  let err = new Error(error.message);
-                  err.code = error.code;
-                  err.stack = error.stack;
-                  item.reject(err);
-                } else {
-                  item.resolve(response);
-                }
-                queue = reject(queue, {id: item.id});
-              }
+              item.resolve(response);
             }
           } catch (error) {
             console.log(error.stack);
@@ -79,23 +70,27 @@ const connector = (url, connectorOptions = {}) => {
     };
   };
   const action = (name, query, model) =>
-  new Promise((resolve, rejectPromise) => {
+  new Promise((resolve, reject) => {
     try {
+      const id = queueId++;
       const message = {
         action: name,
         model,
         query,
-        socketId,
+        id,
       };
       queue.push({
-        id: queueId++,
-        reject: rejectPromise,
+        action: name,
+        id,
+        model: model.name,
+        query,
+        reject,
         resolve,
         socketId,
       });
-      client.send(JSON.stringify(message));
+      client.send(JSON.stringify({message}));
     } catch (error) {
-      rejectPromise(error);
+      reject(error);
     }
   });
   return {

@@ -1,5 +1,3 @@
-import colors from 'colors';
-
 const printHours = date => {
   let hours = date.getHours();
   if (hours < 10) {
@@ -28,20 +26,16 @@ export const log = (message, from, debug, tab = 0) => {
   const now = new Date();
   let _from;
   if (from === 'server') {
-    _from = colors.magenta('SERVER');
+    _from = 'SERVER';
   } else if (from === '?') {
-    _from = colors.cyan('CLIENT -new-');
+    _from = 'CLIENT -new-';
   } else {
-    _from = colors.cyan(`CLIENT #${from}`);
+    _from = `CLIENT #${from}`;
   }
   console.log(
     _from,
-    colors.grey(printHours(now)) +
-      colors.grey(':') +
-      colors.grey(printMinutes(now)) +
-      colors.grey(':') +
-      printSeconds(now),
-    colors.bold(message),
-    colors.italic(JSON.stringify(debug, null, tab))
+    `${printHours(now)}:${printMinutes(now)}:${printSeconds(now)}`,
+    message,
+    JSON.stringify(debug, null, tab),
   );
 };

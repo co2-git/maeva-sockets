@@ -34,10 +34,16 @@ const connector = (url, connectorOptions = {}) => {
         const parsedMessage = JSON.parse(event.data.toString());
         const {connectionInfo} = parsedMessage;
         if (connectionInfo) {
-          connectorIdName = connectionInfo.connectorIdName;
-          socketId = connectionInfo.socket.meta.id;
-          if (connectorIdName && socketId !== '?') {
-            emitter.emit('connected');
+          if (connectionInfo.connected) {
+            connectorIdName = connectionInfo.connectorIdName;
+            // socketId = connectionInfo.socket.meta.id;
+            if (connectorIdName) {
+              emitter.emit('connected');
+            }
+          } else {
+            const error = new Error('Connection to DB lost');
+            error.code = 'DISCONNECTED_FROM_DB';
+            emitter.emit('error', error);
           }
         } else if (parsedMessage.message) {
           try {
@@ -131,6 +137,9 @@ const connector = (url, connectorOptions = {}) => {
     emitter,
     name: 'websockets',
     idName: () => connectorIdName,
+    options: {
+      keepAlive: connectorOptions.keepAlive,
+    },
   };
 };
 

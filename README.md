@@ -1,9 +1,7 @@
 maeva-sockets
 ===
 
-Framework to set up a web sockets server that can transport database queries and deliver them to clients.
-
-`maeva-sockets` relies on [maeva](https://github.com/co2-git/maeva).
+Client/server web sockets API to connect any database via [maeva](https://github.com/co2-git/maeva)
 
 # Why
 
@@ -14,42 +12,48 @@ Even when you have a database server set up, you need a relay server (HTTP or We
 It is easy to set up a server. Let's say you want to set up a server that can transport queries to a MongoDB server:
 
 ```javascript
-import {Server} from 'maeva-sockets';
-import mongodb from 'maeva-mongodb';
+import sockets from '@maeva/sockets/server';
+import mongodb from '@maeva/mongodb';
 
-const port = 7000;
-const mongodbUrl = 'mongodb://@localhost:27019';
-const drivers = [
-  {
-    name: 'mongodb',
-    connect: () => mongodb(mongodbUrl),
-  }
-];
+const WS_URL = 'ws://localhost:9999'; // Web sockets server URL
+const DB_URL = 'mongodb://localhost:7777'; // Database URL
 
-// Start server
-export default new Server(port, drivers)
-  .on('error', (error) => {})
-  .on('listening', (conn) => {
-    console.log(`listening on port ${conn.port}`);
-  });
+sockets
+  .start(WS_URL, {connector: () => mongodb(DB_URL, {keepAlive: 5000})})
+  .on('error', error => console.log(error));
 ```
 
 # Client
 
 ```javascript
-import maeva, {Model, type} from 'maeva';
-import sockets from 'maeva-sockets';
+import * as data from 'maeva';
+import sockets from '@maeva/sockets/client';
 
-// Define your maeva model
-class User extends Model {
-  static schema = {email: type(String)};
-}
+// Define your data model
+const userModel = data.model('users', {name: String});
 
 // Connect to sockets server
-const serverURL = 'ws://localhost:7000';
-
-maeva.connect(sockets(serverURL));
+maeva.connect(sockets('ws://localhost:9999', {keepAlive: 3000}));
 
 // Now you can call any queries
-User.find().then(users => console.log(users.toJSON()));
+const users = await data.findMany(userModel);
+```
+
+# Server events
+
+- `closed` Web sockets server down
+- `connected` Web sockets server successfully connected to database
+- `disconnected` Web sockets server lost connection to database
+- `error` Web sockets server had an error
+- `incoming` New web socket client
+- `listening` Web sockets server started
+- `outcoming` Web socket sent a message to client
+- `response` Web socket server got response from DB
+
+# Client
+
+When the sockets server is up, but the connection to database is down, server emits an error that has code `DISCONNECTED_FROM_DB` that you can catch like this:
+
+```js
+const client = data.connect(sockets('ws://localhost:8080'));
 ```
